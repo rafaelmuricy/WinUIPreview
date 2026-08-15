@@ -1,0 +1,93 @@
+{
+  "name": "winui-3-preview",
+  "displayName": "WinUI 3 Preview",
+  "description": "Extension to preview XAML files",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:xaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "winui-3-preview.openPreview",
+        "title": "Preview XAML",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "winui-3-preview.viewCode",
+        "title": "View Code"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "winui-3-preview.openPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "winui-3-preview.openPreview",
+          "when": "resourceExtname == .xaml || editorLangId == xaml",
+          "group": "navigation@1"
+        },
+        {
+          "command": "winui-3-preview.viewCode",
+          "when": "(resourceExtname == .xaml || editorLangId == xaml) && winui-3-preview.hasCodeBehind",
+          "group": "navigation@1.1"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "xaml",
+        "aliases": [
+          "XAML",
+          "xaml"
+        ],
+        "extensions": [
+          ".xaml"
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "~24.13.3",
+    "@types/vscode": "^1.125.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
+    "eslint": "^10.5.0",
+    "ts-loader": "^9.6.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
+    "webpack": "^5.107.2",
+    "webpack-cli": "^7.0.3"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.10.1"
+  }
+}
