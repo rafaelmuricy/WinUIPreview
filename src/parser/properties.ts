@@ -45,6 +45,9 @@ const GLOBAL_STYLE_PROPS = new Set([
 /** Tags that use HorizontalAlignment to align children, not the element itself. */
 const CONTENT_HORIZONTAL_ALIGN_TAGS = new Set(['stackpanel']);
 
+/** Panels that sit in the center of the parent when alignment is omitted. */
+const DEFAULT_CENTER_IN_PARENT_TAGS = new Set(['canvas', 'relativepanel']);
+
 const TAG_SPECIFIC_PROPS: Record<string, Set<string>> = {
 	stackpanel: new Set(['orientation', 'spacing']),
 	border: new Set(['borderbrush', 'borderthickness', 'cornerradius']),
@@ -153,6 +156,9 @@ const TAG_SPECIFIC_PROPS: Record<string, Set<string>> = {
 		'selecteditem',
 		'selectionmode',
 		'itemssource',
+		'itemtemplate',
+		'itemclick',
+		'isitemclickenabled',
 	]),
 	listviewitem: new Set(['content', 'isselected']),
 	'listview.header': new Set([]),
@@ -170,6 +176,27 @@ const TAG_SPECIFIC_PROPS: Record<string, Set<string>> = {
 	'navigationviewitem.icon': new Set([]),
 	datatemplate: new Set([]),
 	ellipse: new Set(['fill', 'stroke', 'strokethickness']),
+	canvas: new Set([]),
+	'canvas.resources': new Set([]),
+	relativepanel: new Set([]),
+	'relativepanel.resources': new Set([]),
+	splitview: new Set([
+		'panebackground',
+		'ispaneopen',
+		'openpanelength',
+		'compactpanelength',
+		'displaymode',
+		'paneplacement',
+	]),
+	'splitview.pane': new Set([]),
+	'splitview.content': new Set([]),
+	rectangle: new Set([
+		'fill',
+		'stroke',
+		'strokethickness',
+		'radiusx',
+		'radiusy',
+	]),
 	personpicture: new Set(['displayname', 'initials', 'profilepicture']),
 	image: new Set(['source', 'stretch']),
 	calendardatepicker: new Set([
@@ -240,8 +267,16 @@ const TAG_SPECIFIC_PROPS: Record<string, Set<string>> = {
 		'acceptsreturn',
 		'textwrapping',
 	]),
-	flipview: new Set(['selectedindex']),
-	flipviewitem: new Set([]),
+	flipview: new Set([
+		'selectedindex',
+		'itemssource',
+		'borderbrush',
+		'borderthickness',
+	]),
+	flipviewitem: new Set(['content']),
+	'flipview.itemtemplate': new Set([]),
+	'flipview.itemspanel': new Set([]),
+	'flipview.items': new Set([]),
 	pipspager: new Set([
 		'numberofpages',
 		'selectedpageindex',
@@ -252,6 +287,8 @@ const TAG_SPECIFIC_PROPS: Record<string, Set<string>> = {
 	radiobuttons: new Set(['header', 'selectedindex', 'maxcolumns']),
 	selectorbar: new Set([]),
 	selectorbaritem: new Set(['text', 'icon', 'isselected']),
+	viewbox: new Set(['stretch', 'stretchdirection']),
+	'viewbox.child': new Set([]),
 	page: new Set([]),
 	usercontrol: new Set([]),
 	window: new Set([]),
@@ -271,6 +308,34 @@ const GRID_ATTACHED_PROPS = new Set([
 	'grid.column',
 	'grid.rowspan',
 	'grid.columnspan',
+]);
+
+/** Props that any element inside a Canvas may carry (attached properties). */
+const CANVAS_ATTACHED_PROPS = new Set([
+	'canvas.left',
+	'canvas.top',
+	'canvas.right',
+	'canvas.bottom',
+	'canvas.zindex',
+]);
+
+const RELATIVE_PANEL_ATTACHED_PROPS = new Set([
+	'relativepanel.leftof',
+	'relativepanel.rightof',
+	'relativepanel.above',
+	'relativepanel.below',
+	'relativepanel.alignleftwith',
+	'relativepanel.aligntopwith',
+	'relativepanel.alignrightwith',
+	'relativepanel.alignbottomwith',
+	'relativepanel.alignhorizontalcenterwith',
+	'relativepanel.alignverticalcenterwith',
+	'relativepanel.alignleftwithpanel',
+	'relativepanel.aligntopwithpanel',
+	'relativepanel.alignrightwithpanel',
+	'relativepanel.alignbottomwithpanel',
+	'relativepanel.alignhorizontalcenterwithpanel',
+	'relativepanel.alignverticalcenterwithpanel',
 ]);
 
 function isIgnorableAttribute(name: string): boolean {
@@ -301,6 +366,12 @@ function isKnownProperty(tagLocalName: string, propLocalLower: string): boolean 
 		return true;
 	}
 	if (GRID_ATTACHED_PROPS.has(propLocalLower)) {
+		return true;
+	}
+	if (CANVAS_ATTACHED_PROPS.has(propLocalLower)) {
+		return true;
+	}
+	if (RELATIVE_PANEL_ATTACHED_PROPS.has(propLocalLower)) {
 		return true;
 	}
 	return false;
@@ -412,6 +483,13 @@ export function processProperties(
 			propLower === 'isbackbuttonvisible' ||
 			propLower === 'issettingsvisible' ||
 			propLower === 'openpanelength' ||
+			propLower === 'compactpanelength' ||
+			propLower === 'panebackground' ||
+			propLower === 'ispaneopen' ||
+			propLower === 'displaymode' ||
+			propLower === 'paneplacement' ||
+			propLower === 'itemtemplate' ||
+			propLower === 'isitemclickenabled' ||
 			propLower === 'panedisplaymode' ||
 			propLower === 'tag' ||
 			propLower === 'displayname' ||
@@ -419,6 +497,7 @@ export function processProperties(
 			propLower === 'profilepicture' ||
 			propLower === 'source' ||
 			propLower === 'stretch' ||
+			propLower === 'stretchdirection' ||
 			propLower === 'dateformat' ||
 			propLower === 'isoutofscopeenabled' ||
 			propLower === 'istodayhighlighted' ||
@@ -450,7 +529,11 @@ export function processProperties(
 			propLower === 'nextbuttonvisibility' ||
 			propLower === 'maxcolumns' ||
 			propLower === 'linestackingstrategy' ||
-			GRID_ATTACHED_PROPS.has(propLower)
+			propLower === 'radiusx' ||
+			propLower === 'radiusy' ||
+			GRID_ATTACHED_PROPS.has(propLower) ||
+			CANVAS_ATTACHED_PROPS.has(propLower) ||
+			RELATIVE_PANEL_ATTACHED_PROPS.has(propLower)
 		) {
 			continue;
 		}
@@ -471,6 +554,7 @@ export function processProperties(
 			case 'closed':
 			case 'closebuttonclick':
 			case 'selectionchanged':
+			case 'itemclick':
 			case 'navigateuri':
 				if (rawValue.trim()) {
 					tooltipParts.push(`${propName}: ${rawValue.trim()}`);
@@ -501,6 +585,14 @@ export function processProperties(
 		}
 	}
 
+	if (DEFAULT_CENTER_IN_PARENT_TAGS.has(node.localName)) {
+		if (getAttr(node, 'HorizontalAlignment') === undefined) {
+			horizontal = 'center';
+		}
+		if (getAttr(node, 'VerticalAlignment') === undefined) {
+			vertical = 'center';
+		}
+	}
 	const selfHorizontal = CONTENT_HORIZONTAL_ALIGN_TAGS.has(node.localName)
 		? undefined
 		: horizontal;

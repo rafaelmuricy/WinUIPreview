@@ -2,7 +2,9 @@ import * as vscode from 'vscode';
 import {
 	disposePreview,
 	openXamlPreview,
+	refreshPreviewForActiveEditor,
 	refreshPreviewForSavedDocument,
+	registerPreviewViewProvider,
 } from './preview';
 
 const HAS_CODE_BEHIND_CONTEXT = 'winui-3-preview.hasCodeBehind';
@@ -52,6 +54,8 @@ async function openCodeBehind(): Promise<void> {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	registerPreviewViewProvider(context);
+
 	const openPreviewDisposable = vscode.commands.registerCommand(
 		'winui-3-preview.openPreview',
 		() => {
@@ -72,6 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor((editor) => {
 		updateHasCodeBehindContext(editor);
+		refreshPreviewForActiveEditor(editor);
 	});
 
 	const codeBehindWatcher = vscode.workspace.createFileSystemWatcher('**/*.xaml.cs');

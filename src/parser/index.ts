@@ -4,6 +4,7 @@ import { renderBorder } from './Border';
 import { renderButton } from './Button';
 import { renderCalendarDatePicker } from './CalendarDatePicker';
 import { renderCalendarView } from './CalendarView';
+import { renderCanvas } from './Canvas';
 import { renderCheckBox } from './CheckBox';
 import { renderColorPicker } from './ColorPicker';
 import { renderComboBox } from './ComboBox';
@@ -37,8 +38,10 @@ import { renderPipsPager } from './PipsPager';
 import { processProperties } from './properties';
 import { renderProgressBar } from './ProgressBar';
 import { renderProgressRing } from './ProgressRing';
+import { renderRelativePanel } from './RelativePanel';
 import { renderRadioButton } from './RadioButton';
 import { renderRadioButtons } from './RadioButtons';
+import { renderRectangle } from './Rectangle';
 import { renderRatingControl } from './RatingControl';
 import { renderRichEditBox } from './RichEditBox';
 import { renderParagraph, renderRichTextBlock, renderRun } from './RichTextBlock';
@@ -46,6 +49,7 @@ import { renderRepeatButton } from './RepeatButton';
 import type { ResourceRegistry } from './resourceRegistry';
 import { renderScrollViewer } from './ScrollViewer';
 import { renderSelectorBar, renderSelectorBarItem } from './SelectorBar';
+import { renderSplitView } from './SplitView';
 import { renderSlider } from './Slider';
 import { renderSplitButton } from './SplitButton';
 import { renderStackPanel } from './StackPanel';
@@ -57,6 +61,7 @@ import { renderToggleButton } from './ToggleButton';
 import { renderToggleSplitButton } from './ToggleSplitButton';
 import { renderToggleSwitch } from './ToggleSwitch';
 import { renderUserControl } from './UserControl';
+import { renderViewbox } from './Viewbox';
 import { renderWindow } from './Window';
 import type { ParseResult, RenderContext, TagHandler, XmlNode } from './types';
 import { parseXamlToNodes } from './xml';
@@ -69,6 +74,7 @@ const handlers: Record<string, TagHandler> = {
 	stackpanel: renderStackPanel,
 	border: renderBorder,
 	scrollviewer: renderScrollViewer,
+	viewbox: renderViewbox,
 	button: renderButton,
 	togglebutton: renderToggleButton,
 	hyperlinkbutton: renderHyperlinkButton,
@@ -100,6 +106,10 @@ const handlers: Record<string, TagHandler> = {
 	navigationviewitem: renderNavigationViewItem,
 	datatemplate: renderDataTemplate,
 	ellipse: renderEllipse,
+	canvas: renderCanvas,
+	relativepanel: renderRelativePanel,
+	splitview: renderSplitView,
+	rectangle: renderRectangle,
 	personpicture: renderPersonPicture,
 	image: renderImage,
 	colorpicker: renderColorPicker,
@@ -277,6 +287,61 @@ function buildDocumentHtml(
 		hideTip();
 	});
 	document.addEventListener('scroll', hideTip, true);
+
+	function layoutViewboxes() {
+		const boxes = document.querySelectorAll('[data-xaml="Viewbox"]');
+		for (let i = boxes.length - 1; i >= 0; i--) {
+			const box = boxes[i];
+			const content = box.firstElementChild;
+			if (!(content instanceof HTMLElement)) {
+				continue;
+			}
+			const cw = content.offsetWidth;
+			const ch = content.offsetHeight;
+			const bw = box.clientWidth;
+			const bh = box.clientHeight;
+			if (cw <= 0 || ch <= 0 || bw <= 0 || bh <= 0) {
+				continue;
+			}
+			let scaleX = bw / cw;
+			let scaleY = bh / ch;
+			const stretch = (box.getAttribute('data-stretch') || 'uniform').toLowerCase();
+			const direction = (box.getAttribute('data-stretch-direction') || 'both').toLowerCase();
+			if (stretch === 'none') {
+				scaleX = 1;
+				scaleY = 1;
+			} else if (stretch === 'uniformtofill') {
+				const s = Math.max(scaleX, scaleY);
+				scaleX = s;
+				scaleY = s;
+			} else if (stretch !== 'fill') {
+				const s = Math.min(scaleX, scaleY);
+				scaleX = s;
+				scaleY = s;
+			}
+			if (direction === 'uponly') {
+				scaleX = Math.max(1, scaleX);
+				scaleY = Math.max(1, scaleY);
+			} else if (direction === 'downonly') {
+				scaleX = Math.min(1, scaleX);
+				scaleY = Math.min(1, scaleY);
+			}
+			content.style.transform = 'scale(' + scaleX + ', ' + scaleY + ')';
+		}
+	}
+
+	function scheduleViewboxLayout() {
+		requestAnimationFrame(layoutViewboxes);
+	}
+
+	layoutViewboxes();
+	window.addEventListener('resize', scheduleViewboxLayout);
+	document.addEventListener('load', scheduleViewboxLayout, true);
+	if (typeof ResizeObserver !== 'undefined') {
+		document.querySelectorAll('[data-xaml="Viewbox"]').forEach(function (box) {
+			new ResizeObserver(scheduleViewboxLayout).observe(box);
+		});
+	}
 })();
 </script>`
 		: '';
@@ -680,6 +745,7 @@ function buildDocumentHtml(
 			background: #cbb8e0;
 			border-color: #cbb8e0;
 		}
+		[data-xaml="Button"],
 		[data-xaml="RepeatButton"],
 		[data-xaml="DropDownButton"],
 		[data-xaml="SplitButton"],
@@ -700,6 +766,7 @@ function buildDocumentHtml(
 			border-radius: 4px;
 			cursor: pointer;
 		}
+		[data-xaml="Button"],
 		[data-xaml="RepeatButton"] {
 			padding: 5px 11px 6px;
 		}
@@ -1182,7 +1249,7 @@ function buildDocumentHtml(
 		[data-xaml="FlipView"] {
 			position: relative;
 			display: flex;
-			align-items: center;
+			align-items: stretch;
 			justify-content: center;
 			overflow: hidden;
 			background: rgba(255, 255, 255, 0.04);
@@ -1195,9 +1262,17 @@ function buildDocumentHtml(
 		[data-xaml="FlipView"] .flip-page {
 			width: 100%;
 			height: 100%;
+			min-width: 0;
+			min-height: 0;
 			display: flex;
-			align-items: center;
+			align-items: stretch;
 			justify-content: center;
+			overflow: hidden;
+		}
+		[data-xaml="FlipView"] .flip-page > [data-xaml="Image"],
+		[data-xaml="FlipView"] .flip-page > [data-xaml="FlipViewItem"] > [data-xaml="Image"] {
+			width: 100%;
+			height: 100%;
 		}
 		[data-xaml="FlipViewItem"] {
 			display: flex;
@@ -1205,15 +1280,65 @@ function buildDocumentHtml(
 			justify-content: center;
 			width: 100%;
 			height: 100%;
+			min-width: 0;
+			min-height: 0;
 		}
-		[data-xaml="FlipView"] .flip-next {
+		[data-xaml="FlipView"] .flip-nav {
 			position: absolute;
-			right: 8px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: rgba(0, 0, 0, 0.45);
+			border-radius: 4px;
+			pointer-events: none;
+			z-index: 1;
+		}
+		[data-xaml="FlipView"] .flip-nav::before {
+			content: "";
+			display: block;
+			width: 0;
+			height: 0;
+			border-style: solid;
+		}
+		[data-xaml="FlipView"].horizontal .flip-nav {
 			top: 50%;
 			transform: translateY(-50%);
-			font-size: 22px;
-			line-height: 1;
-			opacity: 0.4;
+			width: 20px;
+			height: 36px;
+		}
+		[data-xaml="FlipView"].horizontal .flip-prev {
+			left: 8px;
+		}
+		[data-xaml="FlipView"].horizontal .flip-next {
+			right: 8px;
+		}
+		[data-xaml="FlipView"].horizontal .flip-prev::before {
+			border-width: 5px 6px 5px 0;
+			border-color: transparent #ffffff transparent transparent;
+		}
+		[data-xaml="FlipView"].horizontal .flip-next::before {
+			border-width: 5px 0 5px 6px;
+			border-color: transparent transparent transparent #ffffff;
+		}
+		[data-xaml="FlipView"].vertical .flip-nav {
+			left: 50%;
+			transform: translateX(-50%);
+			width: 36px;
+			height: 20px;
+		}
+		[data-xaml="FlipView"].vertical .flip-prev {
+			top: 8px;
+		}
+		[data-xaml="FlipView"].vertical .flip-next {
+			bottom: 8px;
+		}
+		[data-xaml="FlipView"].vertical .flip-prev::before {
+			border-width: 0 5px 6px 5px;
+			border-color: transparent transparent #ffffff transparent;
+		}
+		[data-xaml="FlipView"].vertical .flip-next::before {
+			border-width: 6px 5px 0 5px;
+			border-color: #ffffff transparent transparent transparent;
 		}
 		[data-xaml="PipsPager"] {
 			display: flex;
@@ -1479,6 +1604,49 @@ function buildDocumentHtml(
 			stroke: currentColor;
 			fill: none;
 			stroke-width: 1.5;
+		}
+		[data-xaml="Canvas"] {
+			position: relative;
+			overflow: hidden;
+			box-sizing: border-box;
+		}
+		[data-xaml="Viewbox"] {
+			overflow: hidden;
+			box-sizing: border-box;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+		[data-xaml="Viewbox"] > .viewbox-content {
+			flex: 0 0 auto;
+			width: max-content;
+			height: max-content;
+			max-width: none;
+			max-height: none;
+			transform-origin: center center;
+		}
+		[data-xaml="RelativePanel"] {
+			position: relative;
+			box-sizing: border-box;
+		}
+		[data-xaml="SplitView"] {
+			position: relative;
+			display: flex;
+			flex-direction: row;
+			align-items: stretch;
+			width: max-content;
+			max-width: 100%;
+			height: max-content;
+			box-sizing: border-box;
+		}
+		[data-xaml="SplitView.Pane"],
+		[data-xaml="SplitView.Content"] {
+			box-sizing: border-box;
+		}
+		[data-xaml="Rectangle"] {
+			display: block;
+			box-sizing: border-box;
+			flex-shrink: 0;
 		}
 		[data-xaml="CalendarView"] {
 			min-width: 280px;

@@ -10,7 +10,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:xaml"
+    "onLanguage:xaml",
+    "onView:winui3Preview.sidebar"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -57,7 +58,44 @@
           ".xaml"
         ]
       }
-    ]
+    ],
+    "configuration": {
+      "title": "WinUI 3 Preview",
+      "properties": {
+        "winui-3-preview.openTarget": {
+          "type": "string",
+          "enum": [
+            "sidebar",
+            "editor"
+          ],
+          "enumDescriptions": [
+            "Open the preview in the WinUI 3 Preview activity bar panel",
+            "Open the preview in an editor tab"
+          ],
+          "default": "sidebar",
+          "description": "Where the XAML preview is opened."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "winui3Preview",
+          "title": "WinUI 3 Preview",
+          "icon": "media/winui-preview.svg"
+        }
+      ]
+    },
+    "views": {
+      "winui3Preview": [
+        {
+          "type": "webview",
+          "id": "winui3Preview.sidebar",
+          "name": "Preview",
+          "when": "config.winui-3-preview.openTarget == sidebar"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
