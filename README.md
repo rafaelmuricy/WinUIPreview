@@ -2,6 +2,8 @@
 
 A Visual Studio Code extension that renders a live visual preview of WinUI 3 XAML files without running the app.
 
+![Preview](https://raw.githubusercontent.com/rafaelmuricy/WinUIPreview/refs/heads/main/examples/ezgif-42994a32c7db7a62.gif)
+
 Open a `.xaml` file and use **Preview XAML** from the editor title bar or the command palette. The markup is parsed and shown as HTML in a webview, so you can inspect layout and controls while you edit.
 
 ## Features
@@ -23,11 +25,11 @@ The preview covers common WinUI 3 layouts and controls, including Grid, StackPan
 
 ## Settings
 
-| Setting | Description | Default |
-| --- | --- | --- |
-| `winui-3-preview.openTarget` | Open the preview in the **sidebar** activity bar panel or in an **editor** tab | `sidebar` |
-| `winui-3-preview.hoverShadowColor` | Highlight color when hovering a control in the preview | `#7c3aed` |
-| `winui-3-preview.showUnknownTags` | Show unrecognized XAML tags in the Output channel | `false` |
+| Setting                            | Description                                                                    | Default   |
+| ---------------------------------- | ------------------------------------------------------------------------------ | --------- |
+| `winui-3-preview.openTarget`       | Open the preview in the **sidebar** activity bar panel or in an **editor** tab | `sidebar` |
+| `winui-3-preview.hoverShadowColor` | Highlight color when hovering a control in the preview                         | `#7c3aed` |
+| `winui-3-preview.showUnknownTags`  | Show unrecognized XAML tags in the Output channel                              | `false`   |
 
 ## Requirements
 
