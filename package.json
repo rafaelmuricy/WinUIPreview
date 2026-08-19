@@ -74,6 +74,17 @@
           ],
           "default": "sidebar",
           "description": "Where the XAML preview is opened."
+        },
+        "winui-3-preview.hoverShadowColor": {
+          "type": "string",
+          "format": "color",
+          "default": "#7c3aed",
+          "description": "Color of the box-shadow shown when hovering a control in the preview."
+        },
+        "winui-3-preview.showUnknownTags": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show unrecognized XAML tags in the WinUI 3 Preview output channel."
         }
       }
     },

@@ -17,6 +17,7 @@ export interface RenderContext {
 	renderChildren: (nodes: XmlNode[]) => string;
 	renderNode: (node: XmlNode) => string;
 	hasUnknown: { value: boolean };
+	showUnknownTags: boolean;
 	styleRegistry?: ResourceRegistry;
 	resolveImageSrc?: (source: string) => string | undefined;
 }

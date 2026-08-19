@@ -192,6 +192,8 @@ export interface PreviewHtmlOptions {
 	cspSource: string;
 	styleRegistry?: ResourceRegistry;
 	resolveImageSrc?: (source: string) => string | undefined;
+	hoverShadowRgb?: string;
+	showUnknownTags?: boolean;
 }
 
 function buildDocumentHtml(
@@ -229,6 +231,52 @@ function buildDocumentHtml(
 	tip.hidden = true;
 	document.body.appendChild(tip);
 
+	const hoverOutline = document.createElement('div');
+	hoverOutline.className = 'xaml-hover-outline';
+	document.body.appendChild(hoverOutline);
+
+	let hoveredControl = null;
+
+	function hideHoverOutline() {
+		hoveredControl = null;
+		hoverOutline.classList.remove('is-visible');
+	}
+
+	function positionHoverOutline(el) {
+		const rect = el.getBoundingClientRect();
+		if (rect.width <= 0 || rect.height <= 0) {
+			hoverOutline.classList.remove('is-visible');
+			return;
+		}
+		const style = window.getComputedStyle(el);
+		hoverOutline.style.left = rect.left + 'px';
+		hoverOutline.style.top = rect.top + 'px';
+		hoverOutline.style.width = rect.width + 'px';
+		hoverOutline.style.height = rect.height + 'px';
+		hoverOutline.style.borderRadius = style.borderRadius;
+	}
+
+	function showHoverOutline(el) {
+		hoveredControl = el;
+		positionHoverOutline(el);
+		if (!hoverOutline.classList.contains('is-visible')) {
+			void hoverOutline.offsetWidth;
+		}
+		hoverOutline.classList.add('is-visible');
+	}
+
+	window.addEventListener('message', function (event) {
+		const msg = event.data;
+		if (
+			msg &&
+			msg.type === 'hoverShadowColor' &&
+			typeof msg.rgb === 'string' &&
+			/^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(msg.rgb)
+		) {
+			document.documentElement.style.setProperty('--xaml-hover-rgb', msg.rgb);
+		}
+	});
+
 	function hideTip() {
 		tip.hidden = true;
 		tip.replaceChildren();
@@ -265,6 +313,14 @@ function buildDocumentHtml(
 		if (!(target instanceof Element)) {
 			return;
 		}
+		const control = target.closest('[data-element-line]');
+		if (control) {
+			if (control !== hoveredControl) {
+				showHoverOutline(control);
+			}
+		} else {
+			hideHoverOutline();
+		}
 		const el = target.closest('[data-tooltip-italic], [data-tooltip]');
 		if (!el) {
 			return;
@@ -277,6 +333,9 @@ function buildDocumentHtml(
 		if (!(target instanceof Element)) {
 			return;
 		}
+		if (!(related instanceof Element) || !related.closest('[data-element-line]')) {
+			hideHoverOutline();
+		}
 		const el = target.closest('[data-tooltip-italic], [data-tooltip]');
 		if (!el) {
 			return;
@@ -286,7 +345,12 @@ function buildDocumentHtml(
 		}
 		hideTip();
 	});
-	document.addEventListener('scroll', hideTip, true);
+	document.addEventListener('scroll', function () {
+		hideTip();
+		if (hoveredControl) {
+			positionHoverOutline(hoveredControl);
+		}
+	}, true);
 
 	function layoutViewboxes() {
 		const boxes = document.querySelectorAll('[data-xaml="Viewbox"]');
@@ -335,7 +399,12 @@ function buildDocumentHtml(
 	}
 
 	layoutViewboxes();
-	window.addEventListener('resize', scheduleViewboxLayout);
+	window.addEventListener('resize', function () {
+		scheduleViewboxLayout();
+		if (hoveredControl) {
+			positionHoverOutline(hoveredControl);
+		}
+	});
 	document.addEventListener('load', scheduleViewboxLayout, true);
 	if (typeof ResizeObserver !== 'undefined') {
 		document.querySelectorAll('[data-xaml="Viewbox"]').forEach(function (box) {
@@ -346,6 +415,12 @@ function buildDocumentHtml(
 </script>`
 		: '';
 
+	const hoverShadowRgb =
+		options?.hoverShadowRgb &&
+		/^\d{1,3},\s*\d{1,3},\s*\d{1,3}$/.test(options.hoverShadowRgb)
+			? options.hoverShadowRgb
+			: '124, 58, 237';
+
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -354,6 +429,9 @@ function buildDocumentHtml(
 	${csp}
 	<title>WinUI 3 Preview</title>
 	<style>
+		:root {
+			--xaml-hover-rgb: ${hoverShadowRgb};
+		}
 		html, body {
 			width: 100%;
 			height: 100%;
@@ -1783,6 +1861,23 @@ function buildDocumentHtml(
 			border: 1px solid var(--vscode-editorHoverWidget-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
 			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 		}
+		.xaml-hover-outline {
+			position: fixed;
+			z-index: 9999;
+			pointer-events: none;
+			box-sizing: border-box;
+			opacity: 0;
+			visibility: hidden;
+			transition: opacity 0.5s ease, visibility 0.5s ease;
+			box-shadow:
+				0 0 0 2px rgba(var(--xaml-hover-rgb), 0.7),
+				rgba(var(--xaml-hover-rgb), 0.3) 0px 1px 2px 0px,
+				rgba(var(--xaml-hover-rgb), 0.15) 0px 2px 6px 2px;
+		}
+		.xaml-hover-outline.is-visible {
+			opacity: 1;
+			visibility: visible;
+		}
 	</style>
 </head>
 <body>
@@ -1817,6 +1912,7 @@ export function parseXamlToHtml(
 		const ctx: RenderContext = {
 			output,
 			hasUnknown,
+			showUnknownTags: htmlOptions?.showUnknownTags ?? false,
 			styleRegistry: htmlOptions?.styleRegistry,
 			resolveImageSrc: htmlOptions?.resolveImageSrc,
 			renderChildren: (nodes) => nodes.map((n) => renderNode(n, ctx)).join(''),
@@ -1857,10 +1953,12 @@ export function parseXamlToHtml(
 function renderNode(node: XmlNode, ctx: RenderContext): string {
 	const handler = handlers[node.localName];
 	if (!handler) {
-		ctx.hasUnknown.value = true;
-		ctx.output.appendLine(
-			`Unknown tag: [${node.tagName}] : [${node.line}]`
-		);
+		if (ctx.showUnknownTags) {
+			ctx.hasUnknown.value = true;
+			ctx.output.appendLine(
+				`Unknown tag: [${node.tagName}] : [${node.line}]`
+			);
+		}
 		return '';
 	}
 	return handler(node, ctx);

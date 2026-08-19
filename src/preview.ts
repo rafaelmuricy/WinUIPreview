@@ -24,10 +24,66 @@ function getOutputChannel(): vscode.OutputChannel {
 	return outputChannel;
 }
 
+const DEFAULT_HOVER_SHADOW_RGB = '124, 58, 237';
+
 function getOpenTarget(): PreviewOpenTarget {
 	return vscode.workspace
 		.getConfiguration('winui-3-preview')
 		.get<PreviewOpenTarget>('openTarget', 'sidebar');
+}
+
+function parseCssColorToRgb(value: string | undefined): string {
+	if (!value) {
+		return DEFAULT_HOVER_SHADOW_RGB;
+	}
+
+	const trimmed = value.trim();
+	const hex = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(trimmed);
+	if (hex) {
+		let digits = hex[1];
+		if (digits.length === 3 || digits.length === 4) {
+			digits = digits
+				.slice(0, 3)
+				.split('')
+				.map((part) => part + part)
+				.join('');
+		} else {
+			digits = digits.slice(0, 6);
+		}
+		return [
+			parseInt(digits.slice(0, 2), 16),
+			parseInt(digits.slice(2, 4), 16),
+			parseInt(digits.slice(4, 6), 16),
+		].join(', ');
+	}
+
+	const rgb =
+		/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*[\d.]+)?\s*\)$/i.exec(
+			trimmed
+		);
+	if (rgb) {
+		return [
+			Math.min(255, Number(rgb[1])),
+			Math.min(255, Number(rgb[2])),
+			Math.min(255, Number(rgb[3])),
+		].join(', ');
+	}
+
+	return DEFAULT_HOVER_SHADOW_RGB;
+}
+
+function getHoverShadowRgb(): string {
+	return parseCssColorToRgb(
+		vscode.workspace
+			.getConfiguration('winui-3-preview')
+			.get<string>('hoverShadowColor', '#7c3aed')
+	);
+}
+
+function getShowUnknownTags(): boolean {
+	return vscode.workspace
+		.getConfiguration('winui-3-preview')
+		.get<boolean>('showUnknownTags', false);
 }
 
 function getNonce(): string {
@@ -341,6 +397,8 @@ async function renderDocument(document: vscode.TextDocument): Promise<void> {
 		cspSource: host.webview.cspSource,
 		styleRegistry,
 		resolveImageSrc: createImageResolver(host.webview, document.uri),
+		hoverShadowRgb: getHoverShadowRgb(),
+		showUnknownTags: getShowUnknownTags(),
 	});
 	if (result.hasUnknown || result.error) {
 		output.show(true);
@@ -521,6 +579,35 @@ export function refreshPreviewForSavedDocument(
 	}
 
 	void renderDocument(document);
+}
+
+export function refreshPreviewForConfigurationChange(
+	e: vscode.ConfigurationChangeEvent
+): void {
+	if (e.affectsConfiguration('winui-3-preview.hoverShadowColor')) {
+		const host = getActiveHost();
+		if (host) {
+			void host.webview.postMessage({
+				type: 'hoverShadowColor',
+				rgb: getHoverShadowRgb(),
+			});
+		}
+	}
+
+	if (!e.affectsConfiguration('winui-3-preview.showUnknownTags')) {
+		return;
+	}
+
+	if (!getActiveHost() || !previewSourceUri) {
+		return;
+	}
+
+	const document = vscode.workspace.textDocuments.find(
+		(item) => item.uri.toString() === previewSourceUri?.toString()
+	);
+	if (document) {
+		void renderDocument(document);
+	}
 }
 
 export function refreshPreviewForActiveEditor(

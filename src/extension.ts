@@ -3,6 +3,7 @@ import {
 	disposePreview,
 	openXamlPreview,
 	refreshPreviewForActiveEditor,
+	refreshPreviewForConfigurationChange,
 	refreshPreviewForSavedDocument,
 	registerPreviewViewProvider,
 } from './preview';
@@ -79,6 +80,10 @@ export function activate(context: vscode.ExtensionContext) {
 		refreshPreviewForActiveEditor(editor);
 	});
 
+	const configurationDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+		refreshPreviewForConfigurationChange(e);
+	});
+
 	const codeBehindWatcher = vscode.workspace.createFileSystemWatcher('**/*.xaml.cs');
 	const refreshCodeBehindContext = () => {
 		updateHasCodeBehindContext(vscode.window.activeTextEditor);
@@ -91,6 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
 		viewCodeDisposable,
 		saveDisposable,
 		editorChangeDisposable,
+		configurationDisposable,
 		codeBehindWatcher,
 		codeBehindWatcher.onDidCreate(refreshCodeBehindContext),
 		codeBehindWatcher.onDidDelete(refreshCodeBehindContext)
